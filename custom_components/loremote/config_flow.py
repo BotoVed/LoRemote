@@ -126,15 +126,15 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
     async def async_step_devices(self, user_input=None) -> FlowResult:
         """Manage selected devices."""
         if user_input is not None:
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                data={**self.config_entry.data,
-                      CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
+            return self.async_create_entry(
+                title="",
+                data={CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
             )
-            return self.async_create_entry(title="", data={})
-
         all_entities = _get_all_entities(self.hass)
-        raw_current = self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
+        raw_current = self.config_entry.options.get(
+            CONF_SELECTED_ENTITIES,
+            self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
+        )
         current = [e for e in raw_current if e in all_entities]
 
         schema = vol.Schema({
@@ -149,29 +149,29 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
     async def async_step_channel(self, user_input=None) -> FlowResult:
         """Edit channel settings."""
         if user_input is not None:
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                data={**self.config_entry.data, **user_input},
-            )
-            return self.async_create_entry(title="", data={})
+            return self.async_create_entry(title="", data=user_input)
 
-        data = self.config_entry.data
+        def _get(key, default):
+            return self.config_entry.options.get(
+                key, self.config_entry.data.get(key, default)
+            )
+
         schema = vol.Schema({
             vol.Required(
                 CONF_CHANNEL_NAME,
-                default=data.get(CONF_CHANNEL_NAME, "LongFast"),
+                default=_get(CONF_CHANNEL_NAME, "LongFast"),
             ): str,
             vol.Required(
                 CONF_CHANNEL_KEY,
-                default=data.get(CONF_CHANNEL_KEY, "AQ=="),
+                default=_get(CONF_CHANNEL_KEY, "AQ=="),
             ): str,
             vol.Optional(
                 CONF_UPDATE_INTERVAL,
-                default=data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                default=_get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
             ): int,
             vol.Optional(
                 CONF_PUSH_ENABLED,
-                default=data.get(CONF_PUSH_ENABLED, True),
+                default=_get(CONF_PUSH_ENABLED, True),
             ): bool,
         })
 

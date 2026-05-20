@@ -34,7 +34,10 @@ class LoRemoteCoordinator:
         _LOGGER.info("LoRemote: starting coordinator")
 
         # Build device registry from selected entities
-        selected = self.config.get(CONF_SELECTED_ENTITIES, [])
+        selected = self.entry.options.get(
+            CONF_SELECTED_ENTITIES,
+            self.entry.data.get(CONF_SELECTED_ENTITIES, [])
+        )
         await self.hass.async_add_executor_job(
             self.registry.build, selected
         )
@@ -46,7 +49,10 @@ class LoRemoteCoordinator:
 
         # Start Meshtastic client
         self.client = MeshtasticClient(
-            serial_port=self.config[CONF_SERIAL_PORT],
+            serial_port=self.entry.options.get(
+                CONF_SERIAL_PORT,
+                self.entry.data.get(CONF_SERIAL_PORT, "")
+            ),
             node_id=self.config.get("node_id"),
             on_message=self._on_message_received,
         )
