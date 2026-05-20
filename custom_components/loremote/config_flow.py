@@ -128,8 +128,9 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
                 data={CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
             )
 
-        current = self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
         all_entities = _get_all_entities(self.hass)
+        raw_current = self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
+        current = [e for e in raw_current if e in all_entities]
 
         schema = vol.Schema({
             vol.Optional("entities", default=current): cv.multi_select(all_entities),
