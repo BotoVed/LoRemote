@@ -121,9 +121,6 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class LoRemoteOptionsFlow(config_entries.OptionsFlow):
     """Handle LoRemote options (reconfigure after setup)."""
 
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
-
     async def async_step_init(self, user_input=None):
         """Show options menu."""
         return self.async_show_menu(
