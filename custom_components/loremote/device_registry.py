@@ -5,6 +5,11 @@ import hashlib
 import json
 import logging
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import (
+    area_registry as ar,
+    entity_registry as er,
+    device_registry as dr,
+)
 
 from .const import (
     DOMAIN_TO_TYPE,
@@ -120,8 +125,8 @@ class DeviceRegistry:
         """Load areas from HA area registry."""
         self.areas = {}
         try:
-            area_registry = self.hass.helpers.area_registry.async_get(self.hass)
-            for area in area_registry.async_list_areas():
+            area_reg = ar.async_get(self.hass)
+            for area in area_reg.async_list_areas():
                 icon = AREA_ICONS.get(area.id, AREA_ICONS.get(area.name.lower(), "home"))
                 self.areas[area.id] = {
                     "id": area.id,
@@ -135,14 +140,13 @@ class DeviceRegistry:
     def _get_entity_area(self, entity_id: str) -> str | None:
         """Get area ID for entity."""
         try:
-            er = self.hass.helpers.entity_registry.async_get(self.hass)
-            entry = er.async_get(entity_id)
+            entity_reg = er.async_get(self.hass)
+            entry = entity_reg.async_get(entity_id)
             if entry and entry.area_id:
                 return entry.area_id
-            # Fall back to device area
             if entry and entry.device_id:
-                dr = self.hass.helpers.device_registry.async_get(self.hass)
-                device = dr.async_get(entry.device_id)
+                device_reg = dr.async_get(self.hass)
+                device = device_reg.async_get(entry.device_id)
                 if device and device.area_id:
                     return device.area_id
         except Exception:

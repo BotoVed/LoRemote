@@ -8,12 +8,26 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def test_connection(serial_port: str) -> str:
-    """Test connection to T114 and return node ID. Runs in executor."""
+    """Test connection to T114. Runs in executor."""
+    import time
     import meshtastic.serial_interface
-    iface = meshtastic.serial_interface.SerialInterface(serial_port)
-    node_id = iface.myInfo.my_node_num
-    iface.close()
-    return f"!{node_id:08x}"
+
+    iface = None
+    try:
+        iface = meshtastic.serial_interface.SerialInterface(devPath=serial_port)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            if iface.myInfo is not None:
+                node_num = iface.myInfo.my_node_num
+                return f"!{node_num:08x}"
+            time.sleep(0.5)
+        raise TimeoutError(f"T114 did not initialize within 15s on {serial_port}")
+    finally:
+        if iface:
+            try:
+                iface.close()
+            except Exception:
+                pass
 
 
 class MeshtasticClient:
@@ -32,12 +46,22 @@ class MeshtasticClient:
 
     def connect(self) -> None:
         """Connect to T114. Runs in executor."""
+        import time
         import meshtastic.serial_interface
         from pubsub import pub
 
         _LOGGER.info("LoRemote: connecting to T114 on %s", self._port)
+        self._iface = meshtastic.serial_interface.SerialInterface(devPath=self._port)
 
-        self._iface = meshtastic.serial_interface.SerialInterface(self._port)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            if self._iface.myInfo is not None:
+                self._node_id = f"!{self._iface.myInfo.my_node_num:08x}"
+                break
+            time.sleep(0.5)
+        else:
+            self._iface.close()
+            raise TimeoutError("T114 did not initialize within 15 seconds")
 
         pub.subscribe(self._on_receive, "meshtastic.receive")
         pub.subscribe(self._on_connected, "meshtastic.connection.established")
