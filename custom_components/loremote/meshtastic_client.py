@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Callable, Awaitable
 
+from pubsub import pub
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -48,7 +50,6 @@ class MeshtasticClient:
         """Connect to T114. Runs in executor."""
         import time
         import meshtastic.serial_interface
-        from pubsub import pub
 
         _LOGGER.info("LoRemote: connecting to T114 on %s", self._port)
         self._iface = meshtastic.serial_interface.SerialInterface(devPath=self._port)
@@ -107,12 +108,14 @@ class MeshtasticClient:
         """Called when a packet arrives from mesh."""
         try:
             decoded = packet.get("decoded", {})
-            # Only handle our PRIVATE_APP port
-            if decoded.get("portnum") != "PRIVATE_APP":
+            portnum = decoded.get("portnum")
+            # portnum может быть строкой "PRIVATE_APP" или числом 256
+            if portnum not in ("PRIVATE_APP", 256):
                 return
-
             payload = decoded.get("payload", b"")
-            from_node = f"!{packet.get('from', 0):08x}"
+            if not payload:
+                return
+            from_node = packet.get("fromId") or f"!{packet.get('from', 0):08x}"
 
             import asyncio
             asyncio.run_coroutine_threadsafe(
@@ -122,10 +125,10 @@ class MeshtasticClient:
         except Exception as e:
             _LOGGER.error("LoRemote: error handling received packet: %s", e)
 
-    def _on_connected(self, interface, topic) -> None:
+    def _on_connected(self, interface, topic=None) -> None:
         _LOGGER.info("LoRemote: Meshtastic connection established")
 
-    def _on_lost(self, interface, topic) -> None:
+    def _on_lost(self, interface, topic=None) -> None:
         _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
 
     def set_event_loop(self, loop) -> None:
