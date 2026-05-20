@@ -1,9 +1,11 @@
 """Config flow for LoRemote integration."""
 from __future__ import annotations
 
-import logging
 import glob
+import logging
+
 import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
 
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -17,7 +19,6 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_PUSH_ENABLED,
     CONF_SELECTED_ENTITIES,
-    CONF_ENTITY_NAMES,
     SUPPORTED_DOMAINS,
     DEFAULT_UPDATE_INTERVAL,
 )
@@ -26,11 +27,22 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _detect_serial_ports() -> list[str]:
-    """Detect available serial ports."""
     ports = []
-    for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*", "/dev/serial/by-id/*"]:
+    for pattern in ["/dev/serial/by-id/*", "/dev/ttyUSB*", "/dev/ttyACM*"]:
         ports.extend(glob.glob(pattern))
     return sorted(ports) or ["/dev/ttyUSB0"]
+
+
+def _get_all_entities(hass) -> dict[str, str]:
+    """Return dict of {entity_id: label} for all supported entities."""
+    result = {}
+    for state in hass.states.async_all():
+        domain = state.entity_id.split(".")[0]
+        if domain in SUPPORTED_DOMAINS:
+            friendly = state.attributes.get("friendly_name", state.entity_id)
+            label = f"[{domain}] {friendly}"
+            result[state.entity_id] = label
+    return result
 
 
 class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -43,7 +55,6 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Try to connect to T114
             try:
                 from .meshtastic_client import test_connection
                 node_id = await self.hass.async_add_executor_job(
@@ -70,41 +81,21 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=schema,
             errors=errors,
-            description_placeholders={
-                "detected_ports": ", ".join(ports)
-            }
         )
 
     async def async_step_devices(self, user_input=None) -> FlowResult:
-        """Step 2: Select entities to expose via LoRa."""
+        """Step 2: Select entities."""
         if user_input is not None:
             self._config[CONF_SELECTED_ENTITIES] = user_input.get("entities", [])
-            self._config[CONF_ENTITY_NAMES] = {}
             return self.async_create_entry(
-                title=f"LoRemote ({self._config[CONF_SERIAL_PORT]})",
+                title=f"LoRemote ({self._config[CONF_SERIAL_PORT].split('/')[-1]})",
                 data=self._config,
             )
 
-        # Build entity list grouped by domain
-        all_states = self.hass.states.async_all()
-        entities_by_domain = {}
-        for state in all_states:
-            domain = state.entity_id.split(".")[0]
-            if domain in SUPPORTED_DOMAINS:
-                entities_by_domain.setdefault(domain, [])
-                friendly = state.attributes.get("friendly_name", state.entity_id)
-                entities_by_domain[domain].append(
-                    f"{state.entity_id} ({friendly})"
-                )
-
-        import homeassistant.helpers.config_validation as cv
-        all_entities = {}
-        for domain in SUPPORTED_DOMAINS:
-            for e in entities_by_domain.get(domain, []):
-                all_entities[e] = e
+        all_entities = _get_all_entities(self.hass)
 
         schema = vol.Schema({
-            vol.Optional("entities", default=[]): cv.multi_select(all_entities)
+            vol.Optional("entities", default=[]): cv.multi_select(all_entities),
         })
 
         return self.async_show_form(
@@ -115,62 +106,65 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
+        """Return options flow."""
         return LoRemoteOptionsFlow()
 
 
 class LoRemoteOptionsFlow(config_entries.OptionsFlow):
-    """Handle LoRemote options (reconfigure after setup)."""
+    """Handle LoRemote options."""
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(self, user_input=None) -> FlowResult:
         """Show options menu."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["devices", "channel", "users", "export"],
+            menu_options=["devices", "channel"],
         )
 
-    async def async_step_devices(self, user_input=None):
+    async def async_step_devices(self, user_input=None) -> FlowResult:
         """Manage selected devices."""
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            return self.async_create_entry(
+                title="",
+                data={CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
+            )
 
-        current = self.config_entry.options.get(CONF_SELECTED_ENTITIES, [])
-        all_states = self.hass.states.async_all()
-        import homeassistant.helpers.config_validation as cv
-        all_entities = {}
-        for state in all_states:
-            domain = state.entity_id.split(".")[0]
-            if domain in SUPPORTED_DOMAINS:
-                friendly = state.attributes.get("friendly_name", state.entity_id)
-                label = f"{state.entity_id} ({friendly})"
-                all_entities[label] = label
+        current = self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
+        all_entities = _get_all_entities(self.hass)
 
         schema = vol.Schema({
-            vol.Optional("entities", default=current): cv.multi_select(all_entities)
+            vol.Optional("entities", default=current): cv.multi_select(all_entities),
         })
-        return self.async_show_form(step_id="devices", data_schema=schema)
 
-    async def async_step_channel(self, user_input=None):
+        return self.async_show_form(
+            step_id="devices",
+            data_schema=schema,
+        )
+
+    async def async_step_channel(self, user_input=None) -> FlowResult:
         """Edit channel settings."""
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            return self.async_create_entry(title="", data=user_input)
 
         schema = vol.Schema({
-            vol.Required(CONF_CHANNEL_NAME,
-                default=self.config_entry.data.get(CONF_CHANNEL_NAME, "LongFast")): str,
-            vol.Required(CONF_CHANNEL_KEY,
-                default=self.config_entry.data.get(CONF_CHANNEL_KEY, "AQ==")): str,
-            vol.Optional(CONF_UPDATE_INTERVAL,
-                default=self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)): int,
-            vol.Optional(CONF_PUSH_ENABLED,
-                default=self.config_entry.data.get(CONF_PUSH_ENABLED, True)): bool,
+            vol.Required(
+                CONF_CHANNEL_NAME,
+                default=self.config_entry.data.get(CONF_CHANNEL_NAME, "LongFast"),
+            ): str,
+            vol.Required(
+                CONF_CHANNEL_KEY,
+                default=self.config_entry.data.get(CONF_CHANNEL_KEY, "AQ=="),
+            ): str,
+            vol.Optional(
+                CONF_UPDATE_INTERVAL,
+                default=self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+            ): int,
+            vol.Optional(
+                CONF_PUSH_ENABLED,
+                default=self.config_entry.data.get(CONF_PUSH_ENABLED, True),
+            ): bool,
         })
-        return self.async_show_form(step_id="channel", data_schema=schema)
 
-    async def async_step_users(self, user_input=None):
-        """Manage users — placeholder, shown as info panel."""
-        # User management via separate service call in full implementation
-        return self.async_abort(reason="users_not_implemented_yet")
-
-    async def async_step_export(self, user_input=None):
-        """Export config for HTML client — handled by coordinator."""
-        return self.async_abort(reason="use_export_panel")
+        return self.async_show_form(
+            step_id="channel",
+            data_schema=schema,
+        )
