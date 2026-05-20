@@ -29,11 +29,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "LoRemote — настройки",
-        "menu_options": {
-          "devices": "Управление устройствами",
-          "channel": "Настройки канала"
-        }
+        "title": "LoRemote — настройки"
       },
       "devices": {
         "title": "Устройства LoRemote",

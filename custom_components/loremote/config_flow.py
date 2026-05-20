@@ -117,16 +117,21 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
         """Show options menu."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["devices", "channel"],
+            menu_options={
+                "devices": "Управление устройствами",
+                "channel": "Настройки канала",
+            },
         )
 
     async def async_step_devices(self, user_input=None) -> FlowResult:
         """Manage selected devices."""
         if user_input is not None:
-            return self.async_create_entry(
-                title="",
-                data={CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data={**self.config_entry.data,
+                      CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
             )
+            return self.async_create_entry(title="", data={})
 
         all_entities = _get_all_entities(self.hass)
         raw_current = self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
@@ -144,24 +149,29 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
     async def async_step_channel(self, user_input=None) -> FlowResult:
         """Edit channel settings."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data={**self.config_entry.data, **user_input},
+            )
+            return self.async_create_entry(title="", data={})
 
+        data = self.config_entry.data
         schema = vol.Schema({
             vol.Required(
                 CONF_CHANNEL_NAME,
-                default=self.config_entry.data.get(CONF_CHANNEL_NAME, "LongFast"),
+                default=data.get(CONF_CHANNEL_NAME, "LongFast"),
             ): str,
             vol.Required(
                 CONF_CHANNEL_KEY,
-                default=self.config_entry.data.get(CONF_CHANNEL_KEY, "AQ=="),
+                default=data.get(CONF_CHANNEL_KEY, "AQ=="),
             ): str,
             vol.Optional(
                 CONF_UPDATE_INTERVAL,
-                default=self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                default=data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
             ): int,
             vol.Optional(
                 CONF_PUSH_ENABLED,
-                default=self.config_entry.data.get(CONF_PUSH_ENABLED, True),
+                default=data.get(CONF_PUSH_ENABLED, True),
             ): bool,
         })
 
