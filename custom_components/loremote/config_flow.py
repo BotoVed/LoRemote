@@ -97,15 +97,14 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     f"{state.entity_id} ({friendly})"
                 )
 
-        # Flatten for multi-select
-        all_entities = []
+        import homeassistant.helpers.config_validation as cv
+        all_entities = {}
         for domain in SUPPORTED_DOMAINS:
-            all_entities.extend(entities_by_domain.get(domain, []))
+            for e in entities_by_domain.get(domain, []):
+                all_entities[e] = e
 
         schema = vol.Schema({
-            vol.Optional("entities", default=[]): vol.All(
-                vol.In(all_entities), [str]
-            )
+            vol.Optional("entities", default=[]): cv.multi_select(all_entities)
         })
 
         return self.async_show_form(
