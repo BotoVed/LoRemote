@@ -1,0 +1,109 @@
+"""Meshtastic client — T114 serial connection."""
+from __future__ import annotations
+
+import logging
+from typing import Callable, Awaitable
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def test_connection(serial_port: str) -> str:
+    """Test connection to T114 and return node ID. Runs in executor."""
+    import meshtastic.serial_interface
+    iface = meshtastic.serial_interface.SerialInterface(serial_port)
+    node_id = iface.myInfo.my_node_num
+    iface.close()
+    return f"!{node_id:08x}"
+
+
+class MeshtasticClient:
+    """Manages Serial connection to T114."""
+
+    def __init__(
+        self,
+        serial_port: str,
+        node_id: str | None,
+        on_message: Callable[[bytes, str], Awaitable[None]],
+    ) -> None:
+        self._port = serial_port
+        self._node_id = node_id
+        self._on_message = on_message
+        self._iface = None
+
+    def connect(self) -> None:
+        """Connect to T114. Runs in executor."""
+        import meshtastic.serial_interface
+        from pubsub import pub
+
+        _LOGGER.info("LoRemote: connecting to T114 on %s", self._port)
+
+        self._iface = meshtastic.serial_interface.SerialInterface(self._port)
+
+        pub.subscribe(self._on_receive, "meshtastic.receive")
+        pub.subscribe(self._on_connected, "meshtastic.connection.established")
+        pub.subscribe(self._on_lost, "meshtastic.connection.lost")
+
+        _LOGGER.info("LoRemote: connected to T114, node_id=%s", self._node_id)
+
+    def disconnect(self) -> None:
+        """Disconnect from T114. Runs in executor."""
+        if self._iface:
+            try:
+                self._iface.close()
+            except Exception as e:
+                _LOGGER.warning("LoRemote: error closing interface: %s", e)
+            self._iface = None
+        _LOGGER.info("LoRemote: disconnected from T114")
+
+    def send(self, data: bytes, destination: str, hop_limit: int = 0) -> None:
+        """Send binary data to destination node. Runs in executor."""
+        if not self._iface:
+            _LOGGER.warning("LoRemote: cannot send — not connected")
+            return
+
+        from meshtastic.portnums_pb2 import PortNum
+        try:
+            self._iface.sendData(
+                data,
+                destinationId=destination,
+                portNum=PortNum.PRIVATE_APP,
+                wantAck=False,
+                hopLimit=hop_limit,
+            )
+            _LOGGER.debug(
+                "LoRemote: sent %d bytes to %s (hop_limit=%d)",
+                len(data), destination, hop_limit
+            )
+        except Exception as e:
+            _LOGGER.error("LoRemote: send error: %s", e)
+
+    # ── Internal callbacks ────────────────────────────────────────────────
+
+    def _on_receive(self, packet: dict, interface) -> None:
+        """Called when a packet arrives from mesh."""
+        try:
+            decoded = packet.get("decoded", {})
+            # Only handle our PRIVATE_APP port
+            if decoded.get("portnum") != "PRIVATE_APP":
+                return
+
+            payload = decoded.get("payload", b"")
+            from_node = f"!{packet.get('from', 0):08x}"
+
+            import asyncio
+            asyncio.run_coroutine_threadsafe(
+                self._on_message(payload, from_node),
+                self._loop,
+            )
+        except Exception as e:
+            _LOGGER.error("LoRemote: error handling received packet: %s", e)
+
+    def _on_connected(self, interface, topic) -> None:
+        _LOGGER.info("LoRemote: Meshtastic connection established")
+
+    def _on_lost(self, interface, topic) -> None:
+        _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
+
+    def set_event_loop(self, loop) -> None:
+        """Store asyncio event loop for thread-safe coroutine dispatch."""
+        self._loop = loop

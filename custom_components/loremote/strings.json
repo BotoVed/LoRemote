@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LoRemote — подключение к T114",
+        "description": "Обнаруженные порты: {detected_ports}",
+        "data": {
+          "serial_port": "Серийный порт T114",
+          "channel_name": "Название канала Meshtastic",
+          "channel_key": "Ключ шифрования канала (base64)",
+          "upd": "Интервал пинга (сек)",
+          "psh": "Включить пуши при изменениях"
+        }
+      },
+      "devices": {
+        "title": "LoRemote — выбор устройств",
+        "description": "Выберите устройства доступные с телефона через LoRa",
+        "data": {
+          "entities": "Устройства"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к T114. Проверьте порт и USB-соединение."
+    },
+    "abort": {
+      "already_configured": "LoRemote уже настроен"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LoRemote — настройки",
+        "menu_options": {
+          "devices": "Управление устройствами",
+          "channel": "Настройки канала",
+          "users": "Пользователи",
+          "export": "Экспорт конфига для клиента"
+        }
+      },
+      "devices": {
+        "title": "Устройства LoRemote",
+        "data": {
+          "entities": "Доступные устройства"
+        }
+      },
+      "channel": {
+        "title": "Настройки канала",
+        "data": {
+          "channel_name": "Название канала",
+          "channel_key": "Ключ шифрования",
+          "upd": "Интервал пинга (сек)",
+          "psh": "Пуши при изменениях"
+        }
+      }
+    },
+    "abort": {
+      "users_not_implemented_yet": "Управление пользователями будет добавлено в следующей версии",
+      "use_export_panel": "Используйте панель LoRemote для экспорта конфига"
+    }
+  }
+}
