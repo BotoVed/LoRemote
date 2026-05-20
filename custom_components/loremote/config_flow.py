@@ -115,7 +115,7 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        return LoRemoteOptionsFlow(config_entry)
+        return LoRemoteOptionsFlow()
 
 
 class LoRemoteOptionsFlow(config_entries.OptionsFlow):
@@ -135,17 +135,17 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
 
         current = self.config_entry.options.get(CONF_SELECTED_ENTITIES, [])
         all_states = self.hass.states.async_all()
-        all_entities = []
+        import homeassistant.helpers.config_validation as cv
+        all_entities = {}
         for state in all_states:
             domain = state.entity_id.split(".")[0]
             if domain in SUPPORTED_DOMAINS:
                 friendly = state.attributes.get("friendly_name", state.entity_id)
-                all_entities.append(f"{state.entity_id} ({friendly})")
+                label = f"{state.entity_id} ({friendly})"
+                all_entities[label] = label
 
         schema = vol.Schema({
-            vol.Optional("entities", default=current): cv.multi_select(
-                {e: e for e in all_entities}
-            )
+            vol.Optional("entities", default=current): cv.multi_select(all_entities)
         })
         return self.async_show_form(step_id="devices", data_schema=schema)
 
