@@ -43,12 +43,14 @@ class MeshtasticClient:
         on_message: Callable[[bytes, str], Awaitable[None]],
         on_connected: Callable = None,
         on_lost: Callable = None,
+        on_rx_cb: Callable = None,
     ) -> None:
         self._port = serial_port
         self._node_id = node_id
         self._on_message = on_message
         self._on_connected_cb = on_connected
         self._on_lost_cb = on_lost
+        self._on_rx_cb = on_rx_cb
         self._iface = None
         self._loop = None
 
@@ -122,24 +124,29 @@ class MeshtasticClient:
         """Called when a packet arrives from mesh."""
         try:
             decoded = packet.get("decoded", {})
-            # portnum может быть строкой "PRIVATE_APP" или числом 256
             portnum = decoded.get("portnum")
             from_node = packet.get("fromId") or f"!{packet.get('from', 0):08x}"
+            payload = decoded.get("payload", b"")
+            rssi = packet.get("rxRssi")
+            snr = packet.get("rxSnr")
 
-            # DEBUG — логируем все входящие пакеты
             _LOGGER.debug(
                 "LoRemote: incoming packet from %s portnum=%s",
                 from_node, portnum
             )
 
+            # Логировать ВСЕ пакеты в packet_store через колбэк
+            if self._on_rx_cb and payload:
+                asyncio.run_coroutine_threadsafe(
+                    self._on_rx_cb(payload, from_node, packet, portnum),
+                    self._loop,
+                )
+
+            # Обрабатывать как команды только PRIVATE_APP
             if portnum not in ("PRIVATE_APP", 256):
                 return
-            payload = decoded.get("payload", b"")
             if not payload:
                 return
-            rssi = packet.get("rxRssi")
-            snr = packet.get("rxSnr")
-            # fromId уже строка вида "!a1b2c3d4", from — число
             if self._loop:
                 asyncio.run_coroutine_threadsafe(
                     self._on_message(payload, from_node, packet),

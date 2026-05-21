@@ -76,6 +76,7 @@ class LoRemoteCoordinator:
             on_message=self._on_message_received,
             on_connected=self._on_client_connected,
             on_lost=self._on_client_disconnected,
+            on_rx_cb=self._on_packet_received,
         )
         await self.hass.async_add_executor_job(self.client.connect)
 
@@ -186,6 +187,35 @@ class LoRemoteCoordinator:
                     return True
             time.sleep(2)
         return False
+
+    async def _on_packet_received(
+        self, payload: bytes, from_node: str,
+        raw_packet: dict, portnum
+    ) -> None:
+        """Log ALL incoming packets to packet_store."""
+        import json
+        import msgpack
+        try:
+            decoded = msgpack.unpackb(payload, raw=False)
+            ptype = {1:"CONFIRM",2:"STATUS",3:"PUSH",
+                     4:"CONFIG",5:"CMD",6:"PING"}.get(
+                decoded.get("tp"), f"PRIVATE_{decoded.get('tp','?')}")
+        except Exception:
+            decoded = {"portnum": str(portnum)}
+            ptype = str(portnum).replace("_APP","") if portnum else "UNKNOWN"
+
+        rssi = raw_packet.get("rxRssi")
+        snr = raw_packet.get("rxSnr")
+        hop = raw_packet.get("hopLimit", 0)
+
+        self.packet_store.add_rx(
+            from_node, payload, decoded,
+            rssi, snr, hop
+        )
+        if self.packet_store._packets:
+            self.packet_store._packets[0].ptype = ptype
+
+        self._update_sensors()
 
     async def _on_message_received(self, raw: bytes, from_node: str, raw_packet: dict = None) -> None:
         """Handle incoming LoRa message from phone."""
