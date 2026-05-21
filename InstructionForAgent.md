@@ -24,8 +24,9 @@ init.py, manifest.json, const.py, config_flow.py
 coordinator.py, device_registry.py, ha_bridge.py
 meshtastic_client.py, protocol.py, packet_store.py
 sensor.py, strings.json
-loremote-card/  ← TODO
-brand/icon.png
+loremote-card/
+brand/
+  icon.png   ← иконка для HA UI (копируется из корня репо при сборке ZIP)
 hacs.json
 
 ## Критичные паттерны
@@ -49,10 +50,13 @@ L SW C WH F CV LK BS S SI B A H
 - SenderMissingReqdMsgDataError → topic=None в pubsub колбэках
 - Сенсор unknown → JSON в attributes, не native_value
 
-## Статус v0.2.5 ✅
+## Известные проблемы и решения
+| Иконка в HACS не показывается | Баг HACS #5171 — HACS не поддерживает локальные иконки HA 2026.3+. Не исправить. |
+| Иконка в HA UI (Settings→Integrations) | brand/icon.png должна лежать в custom_components/loremote/brand/icon.png — копируется при сборке ZIP |
+
+## Статус v0.2.8 ✅
 Config/Options Flow, EntitySelector по доменам, Users CRUD,
 экспорт конфига, 9 сенсоров, PacketStore, реконнект, HACS
 
 ## TODO
-- loremote-card/ (Lovelace карточка)
 - HTML-клиент (Web Bluetooth → T1000-E)
