@@ -126,18 +126,66 @@ class LoRemoteCoordinator:
         if not self._running:
             return
         _LOGGER.info("LoRemote: attempting reconnect to T114...")
+
+        serial_port = self.entry.options.get(
+            "serial_port", self.entry.data.get("serial_port", "")
+        )
+
         try:
             await self.hass.async_add_executor_job(self.client.disconnect)
-            await asyncio.sleep(5)  # ждём появления устройства в /dev/
+        except Exception:
+            pass
+
+        # Ждём появления устройства в /dev/ — до 60 секунд
+        appeared = await self.hass.async_add_executor_job(
+            self._wait_for_device, serial_port, 60
+        )
+
+        if not appeared:
+            _LOGGER.warning(
+                "LoRemote: device %s did not appear within 60s, retry in 30s",
+                serial_port
+            )
+            if self._running:
+                self.hass.loop.call_later(30, lambda: asyncio.ensure_future(
+                    self._reconnect(), loop=self.hass.loop
+                ))
+            return
+
+        try:
             await self.hass.async_add_executor_job(self.client.connect)
             _LOGGER.info("LoRemote: reconnect successful")
         except Exception as e:
             _LOGGER.warning("LoRemote: reconnect failed: %s, retry in 30s", e)
             self.packet_store.on_disconnected(f"reconnect failed: {e}")
             self._update_sensors()
-            self.hass.loop.call_later(30, lambda: asyncio.ensure_future(
-                self._reconnect(), loop=self.hass.loop
-            ))
+            if self._running:
+                self.hass.loop.call_later(30, lambda: asyncio.ensure_future(
+                    self._reconnect(), loop=self.hass.loop
+                ))
+
+    def _wait_for_device(self, serial_port: str, timeout: int) -> bool:
+        """Wait for serial device to appear in /dev/. Runs in executor."""
+        import os
+        import time
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            # Проверяем и точный путь и by-id паттерн
+            if os.path.exists(serial_port):
+                _LOGGER.info("LoRemote: device %s appeared", serial_port)
+                time.sleep(1)  # небольшая пауза после появления
+                return True
+            # Также проверяем by-id директорию если путь там
+            if "by-id" in serial_port:
+                import glob
+                pattern = serial_port.rsplit("-if", 1)[0] + "*"
+                if glob.glob(pattern):
+                    _LOGGER.info("LoRemote: device appeared (glob match)")
+                    time.sleep(1)
+                    return True
+            time.sleep(2)
+        return False
 
     async def _on_message_received(self, raw: bytes, from_node: str, raw_packet: dict = None) -> None:
         """Handle incoming LoRa message from phone."""
