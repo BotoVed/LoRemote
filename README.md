@@ -1,40 +1,64 @@
 # LoRemote
 
-Home Assistant custom integration for remote control via LoRa/Meshtastic mesh network.
+**Умный дом через LoRa — когда интернет недоступен или заблокирован**
 
-Works completely **without internet** — uses LoRa radio for communication.
+Живёшь в доме на колёсах? На яхте? На даче где сигнал пропадает в самый неподходящий момент? LoRemote решает эту проблему радикально — выбрасывает интернет из цепочки управления вообще.
 
-## Features
-- Control lights, switches, climate, covers, locks and more
-- Real-time sensor updates via LoRa push
-- Works with Meshtastic devices (T114, T1000-E)
-- Compact MessagePack protocol optimized for LoRa bandwidth
-- Zone-based UI with device grouping
+Телефон → Bluetooth → LoRa-радио → километры воздуха → шлюз → Home Assistant. Никаких облаков, никаких серверов, никаких подписок. Работает даже когда оператор заблокировал всё что можно.
 
-## Requirements
-- Heltec Mesh Node T114 connected via USB
-- Home Assistant OS 2024.1+
-- HACS
+## Как это устроено
 
-## Installation
-1. Add this repository to HACS as custom integration
-2. Install LoRemote via HACS
-3. Restart Home Assistant
-4. Go to Settings → Integrations → Add → LoRemote
-5. Select serial port and channel settings
-6. Choose devices to expose via LoRa
+Берёшь два LoRa-устройства на чипе Meshtastic. Одно вешаешь рядом с сервером HA, второе держишь при себе. Между ними — радиоканал дальностью до нескольких километров. Через него летят компактные команды в бинарном формате — включить свет, выставить температуру, проверить датчики.
 
-## Supported device types
-- Light (on/off + brightness + color temperature)
-- Switch
-- Climate (target temp + mode + fan)
-- Water heater
-- Fan
-- Cover (open/close/position)
-- Lock
-- Binary sensor
-- Sensor
-- Siren
-- Button / Scene
-- Alarm control panel
-- Humidifier
+## Система не сдаётся
+
+Главная фишка LoRemote — **гарантированная доставка команд**. Отправил команду — она будет выполнена, даже если связь прямо сейчас нестабильна:
+
+- Сначала пробует прямой путь (3 попытки без ретрансляции)
+- Если не дошло — переключается на полную мощь mesh-сети (ещё 3 попытки через все доступные узлы)
+- Команды копятся в очереди пока связь не восстановится
+- При восстановлении — сразу запрашивает актуальное состояние всех устройств
+- Только после получения подтверждения от HA команда считается выполненной
+
+Ты нажал "выключить генератор" и ушёл — система сама разберётся и доставит команду.
+
+## Что умеет
+
+- Свет — вкл/выкл, яркость, цветовая температура
+- Климат — кондиционер, отопитель, бойлер с установкой температуры
+- Датчики — температура, влажность, протечка, движение, вибрация, окна
+- Безопасность — замки, сигнализация, сирены
+- Автоматика — сцены, кнопки, любые переключатели
+- 14 типов устройств HA из коробки
+
+## Железо
+
+- **Шлюз**: Heltec Mesh Node T114 → USB → Home Assistant
+- **Клиент**: SenseCAP Card Tracker T1000-E → Bluetooth → телефон
+- Подойдёт любое устройство с прошивкой Meshtastic
+
+## Установка
+
+1. Добавить репозиторий в HACS: `https://github.com/BotoVed/LoRemote`
+2. Установить LoRemote через HACS
+3. Перезапустить Home Assistant
+4. Settings → Integrations → Add → LoRemote
+5. Выбрать порт T114, настроить канал и устройства
+
+## Поддерживаемые типы устройств
+
+| Тип | HA domain |
+|-----|-----------|
+| Свет | `light` |
+| Переключатель | `switch` |
+| Климат | `climate` |
+| Водонагреватель | `water_heater` |
+| Вентилятор | `fan` |
+| Жалюзи/шторы | `cover` |
+| Замок | `lock` |
+| Двоичный датчик | `binary_sensor` |
+| Датчик | `sensor` |
+| Сирена | `siren` |
+| Кнопка/сцена | `button`, `scene` |
+| Сигнализация | `alarm_control_panel` |
+| Увлажнитель | `humidifier` |
