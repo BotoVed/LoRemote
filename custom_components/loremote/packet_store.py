@@ -52,7 +52,7 @@ PACKET_TYPE_NAMES = {
 class PacketStore:
     """Stores packet log, connection history and sessions."""
 
-    MAX_PACKETS = 50
+    MAX_PACKETS = 20
     MAX_CONN_EVENTS = 100
     MAX_SESSIONS = 20
 
@@ -178,7 +178,13 @@ class PacketStore:
         return min(100, int(online_sec * 100 / window))
 
     def to_sensor_values(self) -> dict:
-        packets = [asdict(p) for p in self._packets]
+        def trim_packet(p: dict) -> dict:
+            result = dict(p)
+            if result.get("payload_hex"):
+                result["payload_hex"] = result["payload_hex"][:32] + "..."
+            return result
+
+        packets = [trim_packet(asdict(p)) for p in self._packets]
         conn = [asdict(e) for e in self._conn_events]
         sessions = [asdict(s) for s in self._sessions]
         last_rx = next((p for p in packets if p["dir"] == "rx"), None)

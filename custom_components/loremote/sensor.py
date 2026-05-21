@@ -91,6 +91,14 @@ class LoRemoteSensor(SensorEntity):
 
     def set_value(self, value):
         if self.key in self.JSON_SENSORS:
+            if value and len(str(value)) > 15000:
+                try:
+                    import json as _json
+                    data = _json.loads(value)
+                    if isinstance(data, list):
+                        value = _json.dumps(data[:len(data)//2])
+                except Exception:
+                    pass
             self._json_val = value
         else:
             self._native_val = value
