@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN, CONF_SERIAL_PORT, CONF_SELECTED_ENTITIES
 from .device_registry import DeviceRegistry
 from .meshtastic_client import MeshtasticClient
+from .packet_store import PacketStore
 from .protocol import Protocol
 from .ha_bridge import HABridge
 
@@ -25,9 +26,27 @@ class LoRemoteCoordinator:
 
         self.registry = DeviceRegistry(hass)
         self.protocol = Protocol()
+        self.packet_store = PacketStore()
         self.client: MeshtasticClient | None = None
         self.bridge: HABridge | None = None
         self._running = False
+        self._sensor_entities: dict = {}
+
+    def set_sensor_entities(self, entities: dict) -> None:
+        self._sensor_entities = entities
+
+    def _update_sensors(self) -> None:
+        """Push current state to all sensor entities."""
+        if not self._sensor_entities:
+            return
+        vals = self.packet_store.to_sensor_values()
+        vals["status"] = "online" if self.client and self.client._iface else "offline"
+        vals["node_id"] = self.config.get("node_id", "")
+        vals["devices_count"] = len(self.registry.devices)
+        for key, val in vals.items():
+            sensor = self._sensor_entities.get(key)
+            if sensor:
+                sensor.set_value(val)
 
     async def async_start(self) -> None:
         """Start all components."""
@@ -55,6 +74,8 @@ class LoRemoteCoordinator:
             ),
             node_id=self.config.get("node_id"),
             on_message=self._on_message_received,
+            on_connected=self._on_client_connected,
+            on_lost=self._on_client_disconnected,
         )
         await self.hass.async_add_executor_job(self.client.connect)
 
@@ -65,8 +86,12 @@ class LoRemoteCoordinator:
             protocol=self.protocol,
             client=self.client,
             config=self.config,
+            coordinator=self,
         )
         await self.bridge.async_start()
+
+        self.packet_store.on_connected()
+        self._update_sensors()
 
         self._running = True
         _LOGGER.info("LoRemote: started successfully")
@@ -74,13 +99,25 @@ class LoRemoteCoordinator:
     async def async_stop(self) -> None:
         """Stop all components."""
         self._running = False
+        self.packet_store.on_disconnected("integration stopped")
+        self._update_sensors()
         if self.bridge:
             await self.bridge.async_stop()
         if self.client:
             await self.hass.async_add_executor_job(self.client.disconnect)
         _LOGGER.info("LoRemote: stopped")
 
-    async def _on_message_received(self, raw: bytes, from_node: str) -> None:
+    def _on_client_connected(self) -> None:
+        _LOGGER.info("LoRemote: Meshtastic connection established")
+        self.packet_store.on_connected()
+        self._update_sensors()
+
+    def _on_client_disconnected(self, reason: str = None) -> None:
+        _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
+        self.packet_store.on_disconnected(reason)
+        self._update_sensors()
+
+    async def _on_message_received(self, raw: bytes, from_node: str, raw_packet: dict = None) -> None:
         """Handle incoming LoRa message from phone."""
         try:
             packet = self.protocol.decode(raw)
@@ -88,13 +125,21 @@ class LoRemoteCoordinator:
             _LOGGER.warning("LoRemote: failed to decode packet: %s", e)
             return
 
+        # Log received packet
+        rssi = raw_packet.get("rxRssi") if raw_packet else None
+        snr = raw_packet.get("rxSnr") if raw_packet else None
+        self.packet_store.add_rx(from_node, raw, packet, rssi, snr, hop_limit=0)
+        self._update_sensors()
+
         _LOGGER.debug("LoRemote: received packet from %s: %s", from_node, packet)
         await self.bridge.async_handle_packet(packet, from_node)
 
     def get_export_config(self) -> dict:
         """Generate full config JSON for HTML client export."""
-        config = self.registry.build_export_config(self.config)
-        users = self.entry.options.get("users",
-                self.entry.data.get("users", []))
-        config["usr"] = users
+        config = self.registry.build_export_config(
+            {**self.entry.data, **self.entry.options}
+        )
+        config["usr"] = self.entry.options.get(
+            "users", self.entry.data.get("users", [])
+        )
         return config

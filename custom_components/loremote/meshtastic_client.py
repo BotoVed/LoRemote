@@ -41,10 +41,14 @@ class MeshtasticClient:
         serial_port: str,
         node_id: str | None,
         on_message: Callable[[bytes, str], Awaitable[None]],
+        on_connected: Callable = None,
+        on_lost: Callable = None,
     ) -> None:
         self._port = serial_port
         self._node_id = node_id
         self._on_message = on_message
+        self._on_connected_cb = on_connected
+        self._on_lost_cb = on_lost
         self._iface = None
         self._loop = None
 
@@ -133,10 +137,12 @@ class MeshtasticClient:
             payload = decoded.get("payload", b"")
             if not payload:
                 return
+            rssi = packet.get("rxRssi")
+            snr = packet.get("rxSnr")
             # fromId уже строка вида "!a1b2c3d4", from — число
             if self._loop:
                 asyncio.run_coroutine_threadsafe(
-                    self._on_message(payload, from_node),
+                    self._on_message(payload, from_node, packet),
                     self._loop,
                 )
         except Exception as e:
@@ -144,6 +150,10 @@ class MeshtasticClient:
 
     def _on_connected(self, interface, topic=None) -> None:
         _LOGGER.info("LoRemote: Meshtastic connection established")
+        if self._on_connected_cb:
+            self._on_connected_cb()
 
     def _on_lost(self, interface, topic=None) -> None:
         _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
+        if self._on_lost_cb:
+            self._on_lost_cb(topic)

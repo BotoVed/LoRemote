@@ -27,19 +27,21 @@ MAPPING_PER_PAGE = 8
 class HABridge:
     """Bridge between HA and Meshtastic."""
 
-    def __init__(
+   def __init__(
         self,
         hass: HomeAssistant,
         registry: DeviceRegistry,
         protocol: Protocol,
         client: MeshtasticClient,
         config: dict,
+        coordinator=None,
     ) -> None:
         self.hass = hass
         self.registry = registry
         self.protocol = protocol
         self.client = client
         self.config = config
+        self._coordinator = coordinator
         self._unsub = None
         self._push_enabled = config.get(CONF_PUSH_ENABLED, True)
         self._cfgh: str = ""
@@ -335,12 +337,20 @@ class HABridge:
 
     # ── Send helper ───────────────────────────────────────────────────────
 
-    async def _send(self, data: bytes, to_node: str, attempt: int = 0) -> None:
+   async def _send(self, data: bytes, to_node: str, attempt: int = 0) -> None:
         """Send packet respecting hop_limit strategy."""
         hop_limit = HOP_LIMIT_DIRECT if attempt < HOP_SWITCH_AT else HOP_LIMIT_MESH
+        try:
+            decoded = self.protocol.decode(data)
+            if self._coordinator and self._coordinator.packet_store:
+                self._coordinator.packet_store.add_tx(to_node, data, decoded, hop_limit, attempt)
+        except Exception:
+            pass
         await self.hass.async_add_executor_job(
             self.client.send, data, to_node, hop_limit
         )
+        if self._coordinator:
+            self._coordinator._update_sensors()
 
     def _compute_cfgh(self) -> str:
         """Compute config hash for current registry state."""
