@@ -2,10 +2,21 @@
 from __future__ import annotations
 
 import glob
+import hashlib
 import logging
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.selector import (
+    EntitySelectorConfig,
+    EntitySelector,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectOptionDict,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -33,16 +44,31 @@ def _detect_serial_ports() -> list[str]:
     return sorted(ports) or ["/dev/ttyUSB0"]
 
 
-def _get_all_entities(hass) -> dict[str, str]:
-    """Return dict of {entity_id: label} for all supported entities."""
-    result = {}
-    for state in hass.states.async_all():
-        domain = state.entity_id.split(".")[0]
-        if domain in SUPPORTED_DOMAINS:
-            friendly = state.attributes.get("friendly_name", state.entity_id)
-            label = f"[{domain}] {friendly}"
-            result[state.entity_id] = label
+def _flatten_entities(user_input: dict) -> list[str]:
+    result = []
+    for key, value in user_input.items():
+        if key.startswith("entities_") and isinstance(value, list):
+            result.extend(value)
     return result
+
+
+def _group_by_domain(entity_ids: list[str]) -> dict[str, list[str]]:
+    result = {}
+    for eid in entity_ids:
+        domain = eid.split(".")[0]
+        result.setdefault(domain, []).append(eid)
+    return result
+
+
+def _get_domain_schema(defaults: dict[str, list[str]]) -> vol.Schema:
+    """Build schema with entity selector per domain."""
+    fields = {}
+    for domain in SUPPORTED_DOMAINS:
+        key = f"entities_{domain}"
+        fields[vol.Optional(key, default=defaults.get(domain, []))] = EntitySelector(
+            EntitySelectorConfig(domain=domain, multiple=True),
+        )
+    return vol.Schema(fields)
 
 
 class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -75,6 +101,7 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_CHANNEL_KEY, default="AQ=="): str,
             vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): int,
             vol.Optional(CONF_PUSH_ENABLED, default=True): bool,
+            vol.Optional("name", default="Мой дом"): str,
         })
 
         return self.async_show_form(
@@ -86,17 +113,13 @@ class LoRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_devices(self, user_input=None) -> FlowResult:
         """Step 2: Select entities."""
         if user_input is not None:
-            self._config[CONF_SELECTED_ENTITIES] = user_input.get("entities", [])
+            self._config[CONF_SELECTED_ENTITIES] = _flatten_entities(user_input)
             return self.async_create_entry(
                 title=f"LoRemote ({self._config[CONF_SERIAL_PORT].split('/')[-1]})",
                 data=self._config,
             )
 
-        all_entities = _get_all_entities(self.hass)
-
-        schema = vol.Schema({
-            vol.Optional("entities", default=[]): cv.multi_select(all_entities),
-        })
+        schema = _get_domain_schema({})
 
         return self.async_show_form(
             step_id="devices",
@@ -120,6 +143,8 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
             menu_options={
                 "devices": "Управление устройствами",
                 "channel": "Настройки канала",
+                "users": "Пользователи",
+                "export": "Экспорт конфига",
             },
         )
 
@@ -128,18 +153,14 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(
                 title="",
-                data={CONF_SELECTED_ENTITIES: user_input.get("entities", [])},
+                data={CONF_SELECTED_ENTITIES: _flatten_entities(user_input)},
             )
-        all_entities = _get_all_entities(self.hass)
         raw_current = self.config_entry.options.get(
             CONF_SELECTED_ENTITIES,
             self.config_entry.data.get(CONF_SELECTED_ENTITIES, [])
         )
-        current = [e for e in raw_current if e in all_entities]
-
-        schema = vol.Schema({
-            vol.Optional("entities", default=current): cv.multi_select(all_entities),
-        })
+        defaults = _group_by_domain(raw_current)
+        schema = _get_domain_schema(defaults)
 
         return self.async_show_form(
             step_id="devices",
@@ -178,4 +199,78 @@ class LoRemoteOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="channel",
             data_schema=schema,
+        )
+
+    async def async_step_users(self, user_input=None) -> FlowResult:
+        """Manage users."""
+        if user_input is not None:
+            users = self.config_entry.options.get("users",
+                    self.config_entry.data.get("users", []))
+            new_user = {
+                "id": f"u{len(users)+1}",
+                "n": user_input["username"],
+                "h": hashlib.sha256(
+                    user_input["password"].encode()
+                ).hexdigest()[:8],
+                "rol": user_input["role"],
+            }
+            users = list(users) + [new_user]
+            return self.async_create_entry(title="", data={"users": users})
+
+        from homeassistant.helpers.selector import (
+            SelectSelector, SelectSelectorConfig, SelectOptionDict
+        )
+
+        current_users = self.config_entry.options.get("users",
+                        self.config_entry.data.get("users", []))
+
+        users_list = "\n".join(
+            f"• {u['n']} ({u['rol']})" for u in current_users
+        ) or "Нет пользователей"
+
+        schema = vol.Schema({
+            vol.Required("username"): str,
+            vol.Required("password"): str,
+            vol.Required("role", default="adm"): SelectSelector(
+                SelectSelectorConfig(options=[
+                    SelectOptionDict(value="adm", label="Администратор"),
+                    SelectOptionDict(value="viw", label="Только просмотр"),
+                ])
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="users",
+            data_schema=schema,
+            description_placeholders={"users_list": users_list},
+        )
+
+    async def async_step_export(self, user_input=None) -> FlowResult:
+        """Export config for HTML client."""
+        import json
+
+        coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
+        if coordinator:
+            config = coordinator.get_export_config()
+            config_json = json.dumps(config, ensure_ascii=False, indent=2)
+            export_text = f"window.LORA_CONFIG = {config_json};"
+        else:
+            export_text = "Ошибка: интеграция не запущена"
+
+        if user_input is not None:
+            return self.async_create_entry(title="", data={})
+
+        schema = vol.Schema({
+            vol.Optional("config_export", default=export_text): TextSelector(
+                TextSelectorConfig(
+                    multiline=True,
+                    type=TextSelectorType.TEXT,
+                )
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="export",
+            data_schema=schema,
+            description_placeholders={},
         )

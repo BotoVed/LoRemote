@@ -93,4 +93,8 @@ class LoRemoteCoordinator:
 
     def get_export_config(self) -> dict:
         """Generate full config JSON for HTML client export."""
-        return self.registry.build_export_config(self.config)
+        config = self.registry.build_export_config(self.config)
+        users = self.entry.options.get("users",
+                self.entry.data.get("users", []))
+        config["usr"] = users
+        return config
