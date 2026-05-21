@@ -195,14 +195,24 @@ class LoRemoteCoordinator:
         """Log ALL incoming packets to packet_store."""
         import json
         import msgpack
-        try:
-            decoded = msgpack.unpackb(payload, raw=False)
-            ptype = {1:"CONFIRM",2:"STATUS",3:"PUSH",
-                     4:"CONFIG",5:"CMD",6:"PING"}.get(
-                decoded.get("tp"), f"PRIVATE_{decoded.get('tp','?')}")
-        except Exception:
-            decoded = {"portnum": str(portnum)}
-            ptype = str(portnum).replace("_APP","") if portnum else "UNKNOWN"
+
+        ptype = str(portnum).replace("_APP", "") if portnum else "UNKNOWN"
+        decoded = {}
+
+        if portnum in ("PRIVATE_APP", 256):
+            try:
+                decoded = msgpack.unpackb(payload, raw=False)
+                ptype = {1:"CONFIRM",2:"STATUS",3:"PUSH",
+                         4:"CONFIG",5:"CMD",6:"PING"}.get(
+                    decoded.get("tp"), f"LOREMOTE_{decoded.get('tp','?')}")
+            except Exception:
+                decoded = {"raw": payload.hex()}
+        else:
+            try:
+                text = payload.decode("utf-8")
+                decoded = {"text": text, "portnum": str(portnum)}
+            except Exception:
+                decoded = {"portnum": str(portnum), "hex": payload.hex()[:64]}
 
         rssi = raw_packet.get("rxRssi")
         snr = raw_packet.get("rxSnr")
