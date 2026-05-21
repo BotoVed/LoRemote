@@ -27,7 +27,7 @@ MAPPING_PER_PAGE = 8
 class HABridge:
     """Bridge between HA and Meshtastic."""
 
-   def __init__(
+    def __init__(
         self,
         hass: HomeAssistant,
         registry: DeviceRegistry,
@@ -337,7 +337,7 @@ class HABridge:
 
     # ── Send helper ───────────────────────────────────────────────────────
 
-   async def _send(self, data: bytes, to_node: str, attempt: int = 0) -> None:
+    async def _send(self, data: bytes, to_node: str, attempt: int = 0) -> None:
         """Send packet respecting hop_limit strategy."""
         hop_limit = HOP_LIMIT_DIRECT if attempt < HOP_SWITCH_AT else HOP_LIMIT_MESH
         try:
