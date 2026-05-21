@@ -120,13 +120,20 @@ class MeshtasticClient:
             decoded = packet.get("decoded", {})
             # portnum может быть строкой "PRIVATE_APP" или числом 256
             portnum = decoded.get("portnum")
+            from_node = packet.get("fromId") or f"!{packet.get('from', 0):08x}"
+
+            # DEBUG — логируем все входящие пакеты
+            _LOGGER.debug(
+                "LoRemote: incoming packet from %s portnum=%s",
+                from_node, portnum
+            )
+
             if portnum not in ("PRIVATE_APP", 256):
                 return
             payload = decoded.get("payload", b"")
             if not payload:
                 return
             # fromId уже строка вида "!a1b2c3d4", from — число
-            from_node = packet.get("fromId") or f"!{packet.get('from', 0):08x}"
             if self._loop:
                 asyncio.run_coroutine_threadsafe(
                     self._on_message(payload, from_node),

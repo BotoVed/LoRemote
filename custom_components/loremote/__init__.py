@@ -13,6 +13,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up LoRemote from a config entry."""
+    import logging as _logging
+    _logging.getLogger("custom_components.loremote").setLevel(_logging.DEBUG)
     _LOGGER.info("Setting up LoRemote integration")
 
     coordinator = LoRemoteCoordinator(hass, entry)
