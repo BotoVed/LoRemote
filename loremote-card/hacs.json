@@ -1,0 +1,6 @@
+{
+  "name": "LoRemote Card",
+  "description": "Monitoring card for LoRemote T114 gateway",
+  "render_readme": true,
+  "filename": "loremote-card.js"
+}
