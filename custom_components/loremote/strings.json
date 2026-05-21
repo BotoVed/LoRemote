@@ -2,34 +2,34 @@
   "config": {
     "step": {
       "user": {
-        "title": "LoRemote — подключение к T114",
+        "title": "LoRemote — подключение",
         "data": {
+          "name": "Название дома",
           "serial_port": "Серийный порт T114",
-          "channel_name": "Канал Meshtastic",
+          "channel_name": "Пресет канала",
           "channel_key": "Ключ шифрования (base64)",
           "upd": "Интервал пинга (сек)",
-          "psh": "Пуши при изменениях",
-          "name": "Название дома"
+          "psh": "Пуши при изменениях"
         }
       },
       "devices": {
         "title": "LoRemote — выбор устройств",
         "description": "Выберите устройства доступные с телефона через LoRa",
         "data": {
-          "entities_light": "Освещение",
-          "entities_switch": "Переключатели",
-          "entities_climate": "Климат",
-          "entities_water_heater": "Водонагреватели",
-          "entities_fan": "Вентиляторы",
-          "entities_cover": "Жалюзи и шторы",
-          "entities_lock": "Замки",
-          "entities_binary_sensor": "Двоичные датчики",
-          "entities_sensor": "Датчики",
-          "entities_siren": "Сирены",
-          "entities_button": "Кнопки",
-          "entities_scene": "Сцены",
-          "entities_alarm_control_panel": "Сигнализация",
-          "entities_humidifier": "Увлажнители"
+          "entities_light": "💡 Освещение",
+          "entities_switch": "🔌 Переключатели",
+          "entities_climate": "❄️ Климат",
+          "entities_water_heater": "🚿 Водонагреватели",
+          "entities_fan": "💨 Вентиляторы",
+          "entities_cover": "🪟 Жалюзи и шторы",
+          "entities_lock": "🔒 Замки",
+          "entities_binary_sensor": "🔔 Двоичные датчики",
+          "entities_sensor": "🌡️ Датчики",
+          "entities_siren": "🚨 Сирены",
+          "entities_button": "🔘 Кнопки",
+          "entities_scene": "🎭 Сцены",
+          "entities_alarm_control_panel": "🛡️ Сигнализация",
+          "entities_humidifier": "💧 Увлажнители"
         }
       }
     },
@@ -45,51 +45,81 @@
       "init": {
         "title": "LoRemote — настройки"
       },
-      "devices": {
-        "title": "Устройства LoRemote",
-        "description": "Выберите устройства доступные с телефона через LoRa",
+      "general": {
+        "title": "Основные настройки",
         "data": {
-          "entities_light": "Освещение",
-          "entities_switch": "Переключатели",
-          "entities_climate": "Климат",
-          "entities_water_heater": "Водонагреватели",
-          "entities_fan": "Вентиляторы",
-          "entities_cover": "Жалюзи и шторы",
-          "entities_lock": "Замки",
-          "entities_binary_sensor": "Двоичные датчики",
-          "entities_sensor": "Датчики",
-          "entities_siren": "Сирены",
-          "entities_button": "Кнопки",
-          "entities_scene": "Сцены",
-          "entities_alarm_control_panel": "Сигнализация",
-          "entities_humidifier": "Увлажнители"
+          "name": "Название дома",
+          "upd": "Интервал пинга (сек)",
+          "psh": "Пуши при изменениях"
         }
       },
       "channel": {
         "title": "Настройки канала",
         "data": {
-          "channel_name": "Название канала",
-          "channel_key": "Ключ шифрования",
-          "upd": "Интервал пинга (сек)",
-          "psh": "Пуши при изменениях"
+          "channel_name": "Пресет канала",
+          "channel_key": "Ключ шифрования (base64)"
         }
       },
-      "users": {
-        "title": "Пользователи LoRemote",
-        "description": "Текущие пользователи:\n{users_list}\n\nДобавить нового:",
+      "devices": {
+        "title": "Устройства LoRemote",
+        "description": "Выберите устройства доступные с телефона через LoRa",
+        "data": {
+          "entities_light": "💡 Освещение",
+          "entities_switch": "🔌 Переключатели",
+          "entities_climate": "❄️ Климат",
+          "entities_water_heater": "🚿 Водонагреватели",
+          "entities_fan": "💨 Вентиляторы",
+          "entities_cover": "🪟 Жалюзи и шторы",
+          "entities_lock": "🔒 Замки",
+          "entities_binary_sensor": "🔔 Двоичные датчики",
+          "entities_sensor": "🌡️ Датчики",
+          "entities_siren": "🚨 Сирены",
+          "entities_button": "🔘 Кнопки",
+          "entities_scene": "🎭 Сцены",
+          "entities_alarm_control_panel": "🛡️ Сигнализация",
+          "entities_humidifier": "💧 Увлажнители"
+        }
+      },
+      "users_menu": {
+        "title": "Управление пользователями"
+      },
+      "users_add": {
+        "title": "Добавить пользователя",
+        "description": "Текущие пользователи:\n{users_list}",
         "data": {
           "username": "Имя пользователя",
           "password": "Пароль",
           "role": "Роль"
         }
       },
+      "users_delete": {
+        "title": "Удалить пользователей",
+        "description": "Выберите пользователей для удаления",
+        "data": {
+          "user_ids": "Пользователи"
+        }
+      },
+      "users_edit": {
+        "title": "Редактировать пользователя",
+        "description": "Редактирование: {username}",
+        "data": {
+          "user_id": "Выберите пользователя",
+          "username": "Имя пользователя",
+          "password": "Новый пароль (оставьте пустым чтобы не менять)",
+          "role": "Роль"
+        }
+      },
       "export": {
         "title": "Экспорт конфига для HTML-клиента",
-        "description": "Скопируйте код ниже и вставьте в начало файла index.html",
+        "description": "Скопируйте код и вставьте в начало файла index.html",
         "data": {
-          "config_export": "Конфигурация (только для чтения)"
+          "config_export": "Конфигурация"
         }
       }
+    },
+    "abort": {
+      "no_users": "Нет пользователей для управления",
+      "user_not_found": "Пользователь не найден"
     }
   }
 }

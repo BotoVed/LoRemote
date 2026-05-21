@@ -83,3 +83,20 @@ ROLE_VIEW = "viw"
 
 # Meshtastic port
 MESHTASTIC_PORT_NUM = 256     # PortNum.PRIVATE_APP
+
+# Meshtastic modem presets
+MESHTASTIC_PRESETS = [
+    "LongFast",
+    "LongSlow", 
+    "MediumFast",
+    "MediumSlow",
+    "ShortFast",
+    "ShortSlow",
+]
+
+# Default channel key
+DEFAULT_CHANNEL_KEY = "AQ=="
+
+# Config entry keys
+CONF_HOME_NAME = "name"
+CONF_TIMEZONE = "tz"
