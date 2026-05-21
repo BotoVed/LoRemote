@@ -128,7 +128,7 @@ class LoRemoteCoordinator:
         _LOGGER.info("LoRemote: attempting reconnect to T114...")
         try:
             await self.hass.async_add_executor_job(self.client.disconnect)
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)  # ждём появления устройства в /dev/
             await self.hass.async_add_executor_job(self.client.connect)
             _LOGGER.info("LoRemote: reconnect successful")
         except Exception as e:

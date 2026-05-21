@@ -39,14 +39,46 @@ async def async_setup_entry(
 
 
 class LoRemoteSensor(SensorEntity):
+    # Сенсоры с длинными JSON значениями — хранить в attributes
+    JSON_SENSORS = {
+        "conn_history", "packet_log", "sessions", "last_rx", "last_tx"
+    }
+
     def __init__(self, coordinator, entry, key):
         self._coordinator = coordinator
         self._entry = entry
         self.key = key
         self._attr_unique_id = f"loremote_{entry.entry_id}_{key}"
         self._attr_name = f"LoRemote {key.replace('_', ' ')}"
-        self._attr_native_value = None
+        self._native_val = None
+        self._json_val = None
         self._attr_should_poll = False
+
+    @property
+    def native_value(self):
+        if self.key in self.JSON_SENSORS:
+            # Для JSON сенсоров показываем количество записей
+            if self._json_val:
+                try:
+                    import json
+                    data = json.loads(self._json_val)
+                    if isinstance(data, list):
+                        return len(data)
+                    return "ok"
+                except Exception:
+                    return "error"
+            return 0
+        return self._native_val
+
+    @property
+    def extra_state_attributes(self):
+        if self.key in self.JSON_SENSORS and self._json_val:
+            try:
+                import json
+                return {"data": json.loads(self._json_val)}
+            except Exception:
+                return {"raw": self._json_val}
+        return {}
 
     @property
     def device_info(self):
@@ -58,5 +90,8 @@ class LoRemoteSensor(SensorEntity):
         }
 
     def set_value(self, value):
-        self._attr_native_value = value
+        if self.key in self.JSON_SENSORS:
+            self._json_val = value
+        else:
+            self._native_val = value
         self.schedule_update_ha_state()

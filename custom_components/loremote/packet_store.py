@@ -119,6 +119,9 @@ class PacketStore:
                 break
 
     def on_connected(self):
+        # Не добавлять дубль если уже online
+        if self._is_online:
+            return
         self._is_online = True
         self._last_online_ts = int(time.time())
         self._conn_events.appendleft(ConnEvent(
@@ -129,6 +132,13 @@ class PacketStore:
         ))
 
     def on_disconnected(self, reason: str = None):
+        # Не добавлять дубль если уже offline
+        if not self._is_online and self._conn_events:
+            # Обновить reason последнего события если он None
+            last = self._conn_events[0]
+            if last.event == "offline" and last.reason is None and reason:
+                last.reason = reason
+            return
         duration = None
         if self._last_online_ts:
             duration = int(time.time()) - self._last_online_ts

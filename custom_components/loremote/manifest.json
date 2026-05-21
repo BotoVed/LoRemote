@@ -1,7 +1,7 @@
 {
   "domain": "loremote",
   "name": "LoRemote",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "documentation": "https://github.com/loremote/ha-integration",
   "requirements": [
     "meshtastic>=2.3.0",
