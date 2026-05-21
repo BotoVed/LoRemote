@@ -1,8 +1,10 @@
-# LoRemote
-
 <p align="center">
   <img src="brand/icon.png" alt="LoRemote" />
+  <h1>LoRemote</h1>
 </p>
+
+---
+
 
 **Умный дом через LoRa — когда интернет недоступен или заблокирован**
 
