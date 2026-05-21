@@ -116,6 +116,28 @@ class LoRemoteCoordinator:
         _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
         self.packet_store.on_disconnected(reason)
         self._update_sensors()
+        # Schedule reconnect
+        self.hass.loop.call_later(10, lambda: asyncio.ensure_future(
+            self._reconnect(), loop=self.hass.loop
+        ))
+
+    async def _reconnect(self) -> None:
+        """Try to reconnect to T114."""
+        if not self._running:
+            return
+        _LOGGER.info("LoRemote: attempting reconnect to T114...")
+        try:
+            await self.hass.async_add_executor_job(self.client.disconnect)
+            await asyncio.sleep(2)
+            await self.hass.async_add_executor_job(self.client.connect)
+            _LOGGER.info("LoRemote: reconnect successful")
+        except Exception as e:
+            _LOGGER.warning("LoRemote: reconnect failed: %s, retry in 30s", e)
+            self.packet_store.on_disconnected(f"reconnect failed: {e}")
+            self._update_sensors()
+            self.hass.loop.call_later(30, lambda: asyncio.ensure_future(
+                self._reconnect(), loop=self.hass.loop
+            ))
 
     async def _on_message_received(self, raw: bytes, from_node: str, raw_packet: dict = None) -> None:
         """Handle incoming LoRa message from phone."""
