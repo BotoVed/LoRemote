@@ -11,6 +11,20 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _int(v, default=0):
+    try:
+        return int(v) if v is not None else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _float(v, default=None):
+    try:
+        return float(v) if v is not None else default
+    except (ValueError, TypeError):
+        return default
+
+
 class Protocol:
     """Encode and decode LoRemote packets using MessagePack."""
 
@@ -64,8 +78,8 @@ class Protocol:
         if device_type == "L":
             return {
                 "s": 1 if s == "on" else 0,
-                "bri": attrs.get("brightness", 0),
-                "ct": attrs.get("color_temp", 4000),
+                "bri": _int(attrs.get("brightness", 0) or 0),
+                "ct": _int(attrs.get("color_temp", 4000) or 4000),
             }
         elif device_type in ("SW", "SI"):
             return {"s": 1 if s == "on" else 0}
@@ -73,27 +87,27 @@ class Protocol:
         elif device_type == "C":
             return {
                 "s": 0 if s in ("off", "unavailable") else 1,
-                "th": attrs.get("temperature"),
-                "tc": attrs.get("current_temperature"),
+                "th": _float(attrs.get("temperature")),
+                "tc": _float(attrs.get("current_temperature")),
                 "md": attrs.get("hvac_mode"),
                 "fn": attrs.get("fan_mode"),
             }
         elif device_type == "WH":
             return {
                 "s": 0 if s in ("off", "unavailable") else 1,
-                "th": attrs.get("target_temp_high") or attrs.get("temperature"),
-                "tc": attrs.get("current_temperature"),
+                "th": _float(attrs.get("target_temp_high") or attrs.get("temperature")),
+                "tc": _float(attrs.get("current_temperature")),
                 "md": attrs.get("operation_mode"),
             }
         elif device_type == "F":
             return {
                 "s": 1 if s == "on" else 0,
-                "sp": attrs.get("percentage", 0),
+                "sp": _int(attrs.get("percentage", 0) or 0),
             }
         elif device_type == "CV":
             return {
                 "st": s,
-                "pos": attrs.get("current_position", 0),
+                "pos": _int(attrs.get("current_position", 0) or 0),
             }
         elif device_type == "LK":
             return {"s": s}
@@ -103,7 +117,7 @@ class Protocol:
 
         elif device_type == "S":
             try:
-                v = float(s)
+                v = _float(s, 0)
             except (ValueError, TypeError):
                 v = s
             return {
@@ -116,8 +130,8 @@ class Protocol:
         elif device_type == "H":
             return {
                 "s": 1 if s == "on" else 0,
-                "th": attrs.get("humidity"),
-                "tc": attrs.get("current_humidity"),
+                "th": _float(attrs.get("humidity")),
+                "tc": _float(attrs.get("current_humidity")),
             }
         else:
             return {"s": s}
