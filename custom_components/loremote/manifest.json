@@ -1,7 +1,7 @@
 {
   "domain": "loremote",
   "name": "LoRemote",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "documentation": "https://github.com/BotoVed/LoRemote",
   "issue_tracker": "https://github.com/BotoVed/LoRemote/issues",
   "codeowners": ["@BotoVed"],

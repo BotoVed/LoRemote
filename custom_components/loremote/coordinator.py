@@ -66,6 +66,16 @@ class LoRemoteCoordinator:
             len(self.registry.areas),
         )
 
+        # Start HA bridge first (before client connects)
+        self.bridge = HABridge(
+            hass=self.hass,
+            registry=self.registry,
+            protocol=self.protocol,
+            client=None,
+            config=self.config,
+            coordinator=self,
+        )
+
         # Start Meshtastic client
         self.client = MeshtasticClient(
             serial_port=self.entry.options.get(
@@ -80,15 +90,8 @@ class LoRemoteCoordinator:
         )
         await self.hass.async_add_executor_job(self.client.connect)
 
-        # Start HA bridge (listens to state changes, sends pushes)
-        self.bridge = HABridge(
-            hass=self.hass,
-            registry=self.registry,
-            protocol=self.protocol,
-            client=self.client,
-            config=self.config,
-            coordinator=self,
-        )
+        # Set client in bridge after connection
+        self.bridge.client = self.client
         await self.bridge.async_start()
 
         self.packet_store.on_connected()
@@ -251,7 +254,15 @@ class LoRemoteCoordinator:
         self._update_sensors()
 
         _LOGGER.debug("LoRemote: received packet from %s: %s", from_node, packet)
-        await self.bridge.async_handle_packet(packet, from_node)
+
+        if not self.bridge:
+            _LOGGER.warning("RX  %s  BRIDGE_NOT_READY  dropping packet", from_node)
+            return
+
+        try:
+            await self.bridge.async_handle_packet(packet, from_node)
+        except Exception as e:
+            _LOGGER.error("RX  %s  HANDLE_ERROR  %s", from_node, e, exc_info=True)
 
     def get_export_config(self) -> dict:
         """Generate full config JSON for HTML client export."""

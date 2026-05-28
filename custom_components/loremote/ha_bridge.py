@@ -49,6 +49,9 @@ class HABridge:
 
     async def async_start(self) -> None:
         """Start listening to HA state changes."""
+        if not self.client:
+            _LOGGER.error("LoRemote: HABridge started without client!")
+            return
         self.client.set_event_loop(asyncio.get_event_loop())
 
         if self._push_enabled:
