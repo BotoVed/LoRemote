@@ -72,9 +72,13 @@ class HABridge:
         """Route incoming packet to the right handler."""
         self._last_phone_node = from_node
         tp = packet.get("tp")
-        _LOGGER.debug(
-            "LoRemote: handle_packet tp=%s from=%s packet=%s",
-            tp, from_node, packet
+        _LOGGER.warning(
+            "ROUTE  tp=%s  type=%s  PKT_PING=%s  PKT_CMD=%s  "
+            "eq_ping=%s  eq_cmd=%s  keys=%s",
+            tp, type(tp).__name__,
+            PKT_PING, PKT_CMD,
+            tp == PKT_PING, tp == PKT_CMD,
+            list(packet.keys())
         )
 
         if tp == PKT_PING:
