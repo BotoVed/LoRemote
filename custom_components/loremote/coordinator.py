@@ -109,12 +109,12 @@ class LoRemoteCoordinator:
         _LOGGER.info("LoRemote: stopped")
 
     def _on_client_connected(self) -> None:
-        _LOGGER.info("LoRemote: Meshtastic connection established")
+        _LOGGER.info("CONNECTED  Meshtastic node online")
         self.packet_store.on_connected()
         self._update_sensors()
 
     def _on_client_disconnected(self, reason: str = None) -> None:
-        _LOGGER.warning("LoRemote: Meshtastic connection lost — will retry")
+        _LOGGER.warning("DISCONNECTED  reason=%s  retry in 10s", reason)
         self.packet_store.on_disconnected(reason)
         self._update_sensors()
         # Schedule reconnect
@@ -232,8 +232,17 @@ class LoRemoteCoordinator:
         try:
             packet = self.protocol.decode(raw)
         except Exception as e:
-            _LOGGER.warning("LoRemote: failed to decode packet: %s", e)
+            _LOGGER.warning("RX  %s  DECODE_ERROR  %s  hex=%s", from_node, e, raw.hex())
             return
+
+        _LOGGER.info(
+            "RX  %s  tp=%s  payload=%s  rssi=%s snr=%s",
+            from_node,
+            packet.get("tp"),
+            packet,
+            raw_packet.get("rxRssi") if raw_packet else None,
+            raw_packet.get("rxSnr") if raw_packet else None,
+        )
 
         # Log received packet
         rssi = raw_packet.get("rxRssi") if raw_packet else None

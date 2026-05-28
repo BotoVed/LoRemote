@@ -85,7 +85,7 @@ class HABridge:
             elif "id" in packet:
                 await self._handle_command(packet, from_node)
         else:
-            _LOGGER.warning("LoRemote: unknown packet tp=%s", tp)
+            _LOGGER.warning("RX  %s  UNKNOWN_TYPE  tp=%s  packet=%s", from_node, tp, packet)
 
     async def _handle_ping(self, packet: dict, from_node: str) -> None:
         """Reply to ping with echo + cfgh."""
@@ -196,8 +196,18 @@ class HABridge:
 
         try:
             await self._call_service(domain, device_type, entity_id, packet)
+            _LOGGER.info(
+                "SET  %s  cmd=%s  ok",
+                entity_id,
+                {k: v for k, v in packet.items() if k not in ("tp", "id")},
+            )
         except Exception as e:
-            _LOGGER.error("LoRemote: service call failed for %s: %s", entity_id, e)
+            _LOGGER.error(
+                "SET  %s  cmd=%s  FAIL  %s",
+                entity_id,
+                {k: v for k, v in packet.items() if k not in ("tp", "id")},
+                e,
+            )
 
         # Send confirmation with actual current state
         await asyncio.sleep(0.5)
@@ -205,6 +215,11 @@ class HABridge:
         state_dict = self.protocol.extract_state(entity_id, state, device_type)
         confirm = self.protocol.make_confirm(short_id, state_dict)
         await self._send(confirm, from_node)
+        _LOGGER.info(
+            "CONFIRM  %s  state=%s",
+            entity_id,
+            state_dict,
+        )
 
     async def _call_service(
         self, domain: str, device_type: str, entity_id: str, packet: dict
@@ -342,6 +357,14 @@ class HABridge:
         hop_limit = HOP_LIMIT_DIRECT if attempt < HOP_SWITCH_AT else HOP_LIMIT_MESH
         try:
             decoded = self.protocol.decode(data)
+            _LOGGER.info(
+                "TX  %s  tp=%s  payload=%s  hop=%s attempt=%s",
+                to_node,
+                decoded.get("tp"),
+                decoded,
+                hop_limit,
+                attempt,
+            )
             if self._coordinator and self._coordinator.packet_store:
                 self._coordinator.packet_store.add_tx(to_node, data, decoded, hop_limit, attempt)
         except Exception:
