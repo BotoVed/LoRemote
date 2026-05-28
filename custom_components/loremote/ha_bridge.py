@@ -76,12 +76,8 @@ class HABridge:
         self._last_phone_node = from_node
         tp = packet.get("tp")
         _LOGGER.warning(
-            "ROUTE  tp=%s  type=%s  PKT_PING=%s  PKT_CMD=%s  "
-            "eq_ping=%s  eq_cmd=%s  keys=%s",
-            tp, type(tp).__name__,
-            PKT_PING, PKT_CMD,
-            tp == PKT_PING, tp == PKT_CMD,
-            list(packet.keys())
+            "ROUTE  tp=%s  PKT_CMD=%s  match=%s  keys=%s",
+            tp, PKT_CMD, tp == PKT_CMD, list(packet.keys())
         )
 
         if tp == PKT_PING:
@@ -198,15 +194,18 @@ class HABridge:
         short_id = packet.get("id")
         device = self.registry.get_device(short_id)
         if not device:
-            _LOGGER.warning("LoRemote: unknown device id %s", short_id)
+            _LOGGER.warning(
+                "CMD  UNKNOWN_DEVICE  id=%s  known=%s",
+                short_id, list(self.registry.devices.keys())
+            )
             return
 
         entity_id = device["entity_id"]
         device_type = device["t"]
         domain = entity_id.split(".")[0]
 
-        _LOGGER.info(
-            "LoRemote: executing command entity=%s type=%s packet=%s",
+        _LOGGER.warning(
+            "CMD  entity=%s  type=%s  packet=%s",
             entity_id, device_type, packet
         )
 
@@ -258,7 +257,10 @@ class HABridge:
 
         elif device_type in ("SW", "SI"):
             svc = "turn_on" if s == 1 else "turn_off"
-            _LOGGER.debug("LoRemote: calling %s.%s for %s", domain, svc, entity_id)
+            _LOGGER.warning(
+                "CALL  %s.%s  entity=%s",
+                domain, svc, entity_id
+            )
             await self.hass.services.async_call(domain, svc, service_data)
 
         elif device_type == "C":

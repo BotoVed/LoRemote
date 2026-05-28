@@ -3,6 +3,6 @@
   "description": "Home Assistant control via LoRa/Meshtastic — works without internet",
   "render_readme": true,
   "homeassistant": "2024.1.0",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "filename": "loremote.zip"
 }
