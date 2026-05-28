@@ -194,7 +194,7 @@ class HABridge:
         device_type = device["t"]
         domain = entity_id.split(".")[0]
 
-        try:
+ try:
             await self._call_service(domain, device_type, entity_id, packet)
             _LOGGER.info(
                 "SET  %s  cmd=%s  ok",
