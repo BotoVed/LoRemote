@@ -72,6 +72,10 @@ class HABridge:
         """Route incoming packet to the right handler."""
         self._last_phone_node = from_node
         tp = packet.get("tp")
+        _LOGGER.debug(
+            "LoRemote: handle_packet tp=%s from=%s packet=%s",
+            tp, from_node, packet
+        )
 
         if tp == PKT_PING:
             await self._handle_ping(packet, from_node)
@@ -194,7 +198,12 @@ class HABridge:
         device_type = device["t"]
         domain = entity_id.split(".")[0]
 
- try:
+        _LOGGER.info(
+            "LoRemote: executing command entity=%s type=%s packet=%s",
+            entity_id, device_type, packet
+        )
+
+        try:
             await self._call_service(domain, device_type, entity_id, packet)
             _LOGGER.info(
                 "SET  %s  cmd=%s  ok",
@@ -230,34 +239,41 @@ class HABridge:
 
         if device_type == "L":
             if s == 0:
+                _LOGGER.debug("LoRemote: calling light.turn_off for %s", entity_id)
                 await self.hass.services.async_call("light", "turn_off", service_data)
             else:
                 if "bri" in packet:
                     service_data["brightness"] = int(packet["bri"] * 2.55)
                 if "ct" in packet:
                     service_data["color_temp"] = packet["ct"]
+                _LOGGER.debug("LoRemote: calling light.turn_on for %s", entity_id)
                 await self.hass.services.async_call("light", "turn_on", service_data)
 
         elif device_type in ("SW", "SI"):
             svc = "turn_on" if s == 1 else "turn_off"
+            _LOGGER.debug("LoRemote: calling %s.%s for %s", domain, svc, entity_id)
             await self.hass.services.async_call(domain, svc, service_data)
 
         elif device_type == "C":
             if "s" in packet:
                 svc = "turn_on" if s == 1 else "turn_off"
+                _LOGGER.debug("LoRemote: calling climate.%s for %s", svc, entity_id)
                 await self.hass.services.async_call("climate", svc, service_data)
             if "th" in packet:
                 service_data["temperature"] = packet["th"]
+                _LOGGER.debug("LoRemote: calling climate.set_temperature for %s", entity_id)
                 await self.hass.services.async_call(
                     "climate", "set_temperature", service_data
                 )
             if "md" in packet:
                 service_data["hvac_mode"] = packet["md"]
+                _LOGGER.debug("LoRemote: calling climate.set_hvac_mode for %s", entity_id)
                 await self.hass.services.async_call(
                     "climate", "set_hvac_mode", service_data
                 )
             if "fn" in packet:
                 service_data["fan_mode"] = packet["fn"]
+                _LOGGER.debug("LoRemote: calling climate.set_fan_mode for %s", entity_id)
                 await self.hass.services.async_call(
                     "climate", "set_fan_mode", service_data
                 )
@@ -265,9 +281,11 @@ class HABridge:
         elif device_type == "WH":
             if "s" in packet:
                 svc = "turn_on" if s == 1 else "turn_off"
+                _LOGGER.debug("LoRemote: calling water_heater.%s for %s", svc, entity_id)
                 await self.hass.services.async_call("water_heater", svc, service_data)
             if "th" in packet:
                 service_data["temperature"] = packet["th"]
+                _LOGGER.debug("LoRemote: calling water_heater.set_temperature for %s", entity_id)
                 await self.hass.services.async_call(
                     "water_heater", "set_temperature", service_data
                 )
@@ -275,9 +293,11 @@ class HABridge:
         elif device_type == "F":
             if "s" in packet:
                 svc = "turn_on" if s == 1 else "turn_off"
+                _LOGGER.debug("LoRemote: calling fan.%s for %s", svc, entity_id)
                 await self.hass.services.async_call("fan", svc, service_data)
             if "sp" in packet:
                 service_data["percentage"] = packet["sp"]
+                _LOGGER.debug("LoRemote: calling fan.set_percentage for %s", entity_id)
                 await self.hass.services.async_call(
                     "fan", "set_percentage", service_data
                 )
@@ -285,13 +305,17 @@ class HABridge:
         elif device_type == "CV":
             cmd = packet.get("cmd")
             if cmd == "open":
+                _LOGGER.debug("LoRemote: calling cover.open_cover for %s", entity_id)
                 await self.hass.services.async_call("cover", "open_cover", service_data)
             elif cmd == "close":
+                _LOGGER.debug("LoRemote: calling cover.close_cover for %s", entity_id)
                 await self.hass.services.async_call("cover", "close_cover", service_data)
             elif cmd == "stop":
+                _LOGGER.debug("LoRemote: calling cover.stop_cover for %s", entity_id)
                 await self.hass.services.async_call("cover", "stop_cover", service_data)
             elif "pos" in packet:
                 service_data["position"] = packet["pos"]
+                _LOGGER.debug("LoRemote: calling cover.set_cover_position for %s", entity_id)
                 await self.hass.services.async_call(
                     "cover", "set_cover_position", service_data
                 )
@@ -299,6 +323,7 @@ class HABridge:
         elif device_type == "LK":
             cmd = packet.get("cmd")
             svc = "unlock" if cmd == "unlock" else "lock"
+            _LOGGER.debug("LoRemote: calling lock.%s for %s", svc, entity_id)
             await self.hass.services.async_call("lock", svc, service_data)
 
         elif device_type == "A":
@@ -314,19 +339,23 @@ class HABridge:
             }
             svc = svc_map.get(cmd)
             if svc:
+                _LOGGER.debug("LoRemote: calling alarm_control_panel.%s for %s", svc, entity_id)
                 await self.hass.services.async_call("alarm_control_panel", svc, service_data)
 
         elif device_type == "H":
             if "s" in packet:
                 svc = "turn_on" if s == 1 else "turn_off"
+                _LOGGER.debug("LoRemote: calling humidifier.%s for %s", svc, entity_id)
                 await self.hass.services.async_call("humidifier", svc, service_data)
             if "th" in packet:
                 service_data["humidity"] = packet["th"]
+                _LOGGER.debug("LoRemote: calling humidifier.set_humidity for %s", entity_id)
                 await self.hass.services.async_call(
                     "humidifier", "set_humidity", service_data
                 )
 
         elif device_type == "B":
+            _LOGGER.debug("LoRemote: calling %s.press for %s", domain, entity_id)
             await self.hass.services.async_call(domain, "press", service_data)
 
     # ── HA state change → push to phone ───────────────────────────────────
